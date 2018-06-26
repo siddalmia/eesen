@@ -10,13 +10,19 @@ except:
 import time
 from itertools import islice
 from multiprocessing import Process, Queue
-from models.model_factory import create_model
+
+import tensorflow as tf
+
+if(tf.__version__ == "1.8.0" or tf.__version__ == "1.6.0"):
+    from models_16.model_factory import create_model
+    from models_16.deep_bilstm import *
+else:
+    from models.model_factory import create_model
+    from models.deep_bilstm import *
+    from models.achen import *
 
 from reader.reader_queue import run_reader_queue
 import numpy as np
-import tensorflow as tf
-from models.deep_bilstm import *
-from models.achen import *
 
 from utils.fileutils.kaldi import writeArk, writeScp
 

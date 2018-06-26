@@ -50,7 +50,7 @@ class SatReaderKaldi(SatReader):
 
         feat_dict_info_languages = {}
 
-        for language, scp_path in self._language_scheme.iteritems():
+        for language, scp_path in self._language_scheme.items():
             print("preparing dictionary for "+language+"...\n")
             feat_dict_info_languages[language] = read_scp_info_dic(scp_path[0])
 

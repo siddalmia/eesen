@@ -1,7 +1,7 @@
 from multiprocessing import Process, Queue
 import sys
 import tensorflow as tf
-if(tf.__version__ == "1.6.0"):
+if(tf.__version__ == "1.6.0" or tf.__version__ == "1.8.0"):
     from models_16.model_factory import create_model
 else:
     from models.model_factory import create_model
@@ -232,7 +232,6 @@ class Train():
         #initializinzing dictionaries that will count
         train_ters, ntr_labels, ntrain, train_cost = {}, {}, {}, {}
 
-        #TODO change all iteritems for iter for python 3.0
         #TODO try to do an lm_utils for this kind of functions
         for language_id, target_scheme in self.__config[constants.CONF_TAGS.LANGUAGE_SCHEME].items():
 

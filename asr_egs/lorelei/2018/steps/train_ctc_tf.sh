@@ -20,6 +20,7 @@ nhidden=320
 nproj=""
 nfinalproj=
 ninitproj=""
+batch_norm=false
 
 #speaker adaptation configuration
 sat_type=""
@@ -32,6 +33,9 @@ continue_ckpt_sat=false
 nepoch=""
 lr_rate=""
 debug=false
+batch_size=16
+half_after=2
+window=3
 
 #continue training
 continue_ckpt=""
@@ -41,6 +45,8 @@ force_lr_epoch_ckpt=false
 #training options
 deduplicate=true
 subsampling_default=3
+units_file=
+tmpdir=
 
 ## End configuration section
 
@@ -62,33 +68,41 @@ data_tr=$1
 data_cv=$2
 dir=$3
 
-#creating tmp directory (concrete tmp path is defined in path.sh)
-tmpdir=`mktemp -d`
+if [ -z "$tmpdir" ]; then
+    #creating tmp directory (concrete tmp path is defined in path.sh)
+    echo "Creating a new setup in temp"
+    tmpdir=`mktemp -d`
+else
+    mkdir -p $tmpdir
+fi
 
-trap "echo \"Removing features tmpdir $tmpdir @ $(hostname)\"; ls $tmpdir; rm -r $tmpdir &" ERR EXIT
+#trap "echo \"Removing features tmpdir $tmpdir @ $(hostname)\"; ls $tmpdir; rm -r $tmpdir &" ERR EXIT
 
 #checking folders
-for f in $data_tr/feats.scp $data_cv/feats.scp; do
-  [ ! -f $f ] && echo `basename "$0"`": no such file $f" && exit 1;
-done
+#for f in $data_tr/feats.scp $data_cv/feats.scp; do
+#  [ ! -f $f ] && echo `basename "$0"`": no such file $f" && exit 1;
+#done
 
 #multitarget training check
 
-train_labels=$(ls $dir | grep labels | grep tr)
+#train_labels=$(ls $dir | grep labels | grep tr)
+train_labels=$(ls $data_tr | grep labels)
+cp $data_tr/labels $dir/labels.tr
 
 if [ -z "$train_labels" ]; then
     echo "no training labels found in: $dir"
-    echo "training dir should have \"labels*.tr\""
+    echo "training dir should have \"labels\""
     exit
 fi
 
 #multitarget training checking
 
-cv_labels=$(ls $dir | grep labels | grep cv)
+cv_labels=$(ls $data_cv | grep labels)
+cp $data_cv/labels $dir/labels.cv
 
-if [ -z "$train_labels" ]; then
-    echo "no training labels found in: $dir"
-    echo "training dir should have \"labels*.cv\""
+if [ -z "$cv_labels" ]; then
+    echo "no cv labels found in: $dir"
+    echo "cv dir should have \"labels\""
     exit
 fi
 
@@ -99,6 +113,12 @@ if $debug; then
     debug="--debug"
 else
     debug=""
+fi
+
+if $batch_norm; then
+    batch_norm="--batch_norm"
+else
+    batch_norm=""
 fi
 
 if $force_lr_epoch_ckpt; then
@@ -179,22 +199,29 @@ fi
 
 sat_nlayer="--sat_nlayer $sat_nlayer"
 
-echo ""
-echo copying cv features ...
-echo ""
 
 data_tr=$1
 data_cv=$2
 
-feats_cv="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_cv/utt2spk scp:$data_cv/cmvn.scp scp:$data_cv/feats.scp ark:- |"
-copy-feats "$feats_cv" ark,scp:$tmpdir/cv.ark,$tmpdir/cv_tmp.scp || exit 1;
+if [ ! -f $tmpdir/cv.ark ]; then
+    echo ""
+    echo copying cv features ...
+    echo ""
 
-echo ""
-echo copying training features ...
-echo ""
+    #feats_cv="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_cv/utt2spk scp:$data_cv/cmvn.scp scp:$data_cv/feats.scp ark:- |"
+    feats_cv="scp:$data_cv/tdnn_3_bnf_feats.scp"
+    copy-feats "$feats_cv" ark,scp:$tmpdir/cv.ark,$tmpdir/cv_tmp.scp || exit 1;
+fi
+    
+if [ ! -f $tmpdir/train.ark ]; then
+    echo ""
+    echo copying training features ...
+    echo ""
 
-feats_tr="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_tr/utt2spk scp:$data_tr/cmvn.scp scp:$data_tr/feats.scp ark:- |"
-copy-feats "$feats_tr" ark,scp:$tmpdir/train.ark,$tmpdir/train_tmp.scp || exit 1;
+    #feats_tr="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_tr/utt2spk scp:$data_tr/cmvn.scp scp:$data_tr/feats.scp ark:- |"
+    feats_tr="scp:$data_tr/tdnn_3_bnf_feats.scp"
+    copy-feats "$feats_tr" ark,scp:$tmpdir/train.ark,$tmpdir/train_tmp.scp || exit 1;
+fi
 
 echo ""
 echo copying labels ...
@@ -238,15 +265,27 @@ for f in $tmpdir/*.cv; do
 
 done
 
+if [ ! -f $units_file ]; then
+    echo "Need units file"
+    exit 1;
+fi
+
+python ./utils/fix_units_length.py --labels_tr $tmpdir/labels.tr --labels_cv $tmpdir/labels.cv --units $units_file
+
+
 #path were cache cuda binaries will be compiled and stored
-export CUDA_CACHE_PATH=$tmpdir
+export CUDA_CACHE_PATH=/tmp/cuda_cache_sdalmia
 
 
 cur_time=`date | awk '{print $6 "-" $2 "-" $3 " " $4}'`
 echo "TRAINING STARTS [$cur_time]"
 
+echo $train_tool $train_opts \
+    $batch_norm --batch_size $batch_size --half_after $half_after --model $model --nlayer $nlayer --nhidden $nhidden $ninitproj $nproj $nfinalproj $nepoch $lr_rate \
+    --train_dir $dir --data_dir $tmpdir $sat_stage $sat_type $sat_nlayer $debug $continue_ckpt $continue_ckpt_sat $diff_num_target_ckpt $force_lr_epoch_ckpt
+
 $train_tool $train_opts \
-    --model $model --nlayer $nlayer --nhidden $nhidden $ninitproj $nproj $nfinalproj $nepoch $lr_rate \
+    $batch_norm --batch_size $batch_size --half_after $half_after --model $model --nlayer $nlayer --nhidden $nhidden $ninitproj $nproj $nfinalproj $nepoch $lr_rate \
     --train_dir $dir --data_dir $tmpdir $sat_stage $sat_type $sat_nlayer $debug $continue_ckpt $continue_ckpt_sat $diff_num_target_ckpt $force_lr_epoch_ckpt  || exit 1;
 
 cur_time=`date | awk '{print $6 "-" $2 "-" $3 " " $4}'`

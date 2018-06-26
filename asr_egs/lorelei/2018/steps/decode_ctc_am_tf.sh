@@ -1,4 +1,3 @@
-results=""
 
 subsampled_utt=0
 
@@ -6,14 +5,14 @@ batch_size=16
 
 online_storage=false
 
-config=""
-#/data/ASR5/ramons_2/sinbad_projects/lorelei/full_amharic_cv_tigrinya/exp/new_full_clean_cv_clean/l6_h200_p100_f0_achen_n_9/model/config.pkl
-
-weights=""
-#/data/ASR5/ramons_2/sinbad_projects/lorelei/full_amharic_cv_tigrinya/exp/new_full_clean_cv_clean/l6_h200_p100_f0_achen_n_9/model/epoch11.ckpt
-
+config=
+weights=
+results=
 
 data=""
+tmpdir=
+exp_dir=
+compute_ter=true
 
 
 echo "$0 $@"  # Print the command line for logging
@@ -37,26 +36,48 @@ else
 fi
 
 mkdir -p $results
+mkdir -p $results/.backup
+mv $results/* $results/.backup/
+
 
 norm_vars=true
-compute_ter=false
-tmpdir=`mktemp -d `
 
-feats="ark,s,cs:apply-cmvn --norm-vars=$norm_vars --utt2spk=ark:$data/utt2spk scp:$data/cmvn.scp scp:$data/feats.scp ark:- |"
+if [ -z "$tmpdir" ]; then
+    #creating tmp directory (concrete tmp path is defined in path.sh)
+    echo "Creating a new setup in temp"
+    tmpdir=`mktemp -d`
+else
+    mkdir -p $tmpdir
+fi
 
-copy-feats "${feats}" ark,scp:$tmpdir/f.ark,$tmpdir/test_local.scp
+#feats="ark,s,cs:apply-cmvn --norm-vars=$norm_vars --utt2spk=ark:$data/utt2spk scp:$data/cmvn.scp scp:$data/feats.scp ark:- |"
+if [ ! -f $tmpdir/f.ark ]; then
+    echo ""
+    echo copying test features ...
+    echo ""
+    feats="scp:$data/tdnn_3_bnf_feats.scp"
+    copy-feats "${feats}" ark,scp:$tmpdir/f.ark,$tmpdir/test_local.scp
+fi
+
+labels=$(ls $data | grep labels)
+cp $data/labels $exp_dir/labels.test
+
+if [ -z "$labels" ]; then
+    echo "no test labels found in: $exp_dir"
+    echo "Creating pseudo labels"
+    python ./utils/make_pseudo_labels.py --scp $tmpdir/test_local.scp --labels $tmpdir/labels.test --subsampling 3
+fi
 
 if $compute_ter; then
     compute_ter="--compute_ter"
+    cp $exp_dir/labels.test $tmpdir/
     python ./utils/clean_length.py --scp_in  $tmpdir/test_local.scp --labels $tmpdir/labels.test --subsampling 3 --scp_out $tmpdir/test_local.scp $subsampled_utt_utt
-    cp $data/labels.test
 else
-    force_lr_epoch_ckpt=""
+    compute_ter=""
 fi
 
 
-python -m test --data_dir $tmpdir --results_dir $results --train_config $config --trained_weights $weights --batch_size $batch_size --temperature 1 $online_storage
+echo python -m test --data_dir $tmpdir --results_dir $results --train_config $config --trained_weights $weights --batch_size $batch_size --temperature 1 $online_storage $compute_ter
 
-#python /data/ASR5/ramons_2/sinbad_projects/youtube_project/am/eesen_20170714/tf/ctc-am/test.py --data_dir $tmpdir --results_dir $results --train_config $config --trained_weights $weight --batch_size 1 --temperature 1
-
+python -m test --data_dir $tmpdir --results_dir $results --train_config $config --trained_weights $weights --batch_size $batch_size --temperature 1 $online_storage $compute_ter
 

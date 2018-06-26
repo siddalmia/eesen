@@ -315,7 +315,7 @@ class DeepBidirRNN:
                         logit = tf.contrib.layers.batch_norm(logit, scope = scope+"_bn", center=True, scale=True, decay=0.9,
                                                              is_training=self.is_training_ph, updates_collections=None)
 
-                    loss = tf.nn.ctc_loss(labels=self.labels[count], inputs=logit, sequence_length=self.seq_len)
+                    loss = tf.nn.ctc_loss(labels=self.labels[count], inputs=logit, sequence_length=self.seq_len, ignore_longer_outputs_than_inputs=True)
                     tmp_cost.append(loss)
                     tmp_debug_cost.append(tf.reduce_mean(loss))
 

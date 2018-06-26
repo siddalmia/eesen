@@ -5,9 +5,11 @@ class MODEL_NAME:
     ACHEN_CONV="achen_conv"
     DEEP_BILSTM="deepbilstm"
     DEEP_BILSTM_RELU="deepbilstmrelu"
+    DEEP_BILSTM_TEST="deepbilstmtest"
     ARCNET="arc_net"
     ARCNET_VIDEO="arc_net_video"
     CONVNET="conv_net"
+    ATTCTC="conv_net"
 
 class DEFAULT_FILENAMES:
     SAT="sat_local"

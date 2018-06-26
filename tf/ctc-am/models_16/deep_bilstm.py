@@ -65,6 +65,7 @@ class DeepBidirRNN:
 
                         outputs, _output_h = cudnn_model(outputs, None, True)
 
+
                         #biases initialized in 0 (default)
                         #weights initialized with xavier (default)
                         outputs = tf.contrib.layers.fully_connected(
@@ -74,10 +75,10 @@ class DeepBidirRNN:
                             scope="intermediate_projection")
 
 
-                if batch_norm:
-                    outputs = tf.contrib.layers.batch_norm(outputs,
-                    scope = "bn", center=True, scale=True, decay=0.9,
-                    is_training=self.is_training_ph, updates_collections=None)
+                        if batch_norm:
+                            outputs = tf.contrib.layers.batch_norm(outputs,
+                            scope = "bn", center=True, scale=True, decay=0.9,
+                            is_training=self.is_training_ph, updates_collections=None)
 
             else:
                 cudnn_model = tf.contrib.cudnn_rnn.CudnnLSTM(nlayer,
@@ -88,7 +89,10 @@ class DeepBidirRNN:
                                                              kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                                              bias_initializer=tf.contrib.layers.xavier_initializer())
 
+
+                # arguments are: inputs, initial_state,
                 outputs, _output_h = cudnn_model(outputs, None, True)
+                #outputs_i, _output_h_i = cudnn_model(outputs, None, False)
 
                 if batch_norm:
                     outputs = tf.contrib.layers.batch_norm(outputs,

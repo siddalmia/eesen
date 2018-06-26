@@ -187,8 +187,9 @@ for language_dir in "${all_lan[@]}"; do
 
     data_cv=$language_dir/$cv_folder
 
-    feats_cv="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_cv/utt2spk scp:$data_cv/cmvn.scp scp:$data_cv/feats.scp ark:- |"
-    copy-feats "$feats_cv" ark,scp:$tmpdir/$language_name/cv.ark,$tmpdir/$language_name/cv_local.scp || exit 1;
+    #feats_cv="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_cv/utt2spk scp:$data_cv/cmvn.scp scp:$data_cv/feats.scp ark:- |"
+    feats_cv="scp:$data_cv/tdnn_3_bnf_feats.scp"
+    copy-feats --compress=true "$feats_cv" ark,scp:$tmpdir/$language_name/cv.ark,$tmpdir/$language_name/cv_local.scp || exit 1;
 
 
     tr_folder=$(ls $language_dir | grep \_tr)
@@ -203,9 +204,9 @@ for language_dir in "${all_lan[@]}"; do
 
     data_tr=$language_dir/$tr_folder
 
-    feats_tr="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_tr/utt2spk scp:$data_tr/cmvn.scp scp:$data_tr/feats.scp ark:- |"
-
-    copy-feats "$feats_tr" ark,scp:$tmpdir/$language_name/train.ark,$tmpdir/$language_name/train_local.scp || exit 1;
+    #feats_tr="ark,s,cs:apply-cmvn --norm-vars=true --utt2spk=ark:$data_tr/utt2spk scp:$data_tr/cmvn.scp scp:$data_tr/feats.scp ark:- |"
+    feats_tr="scp:$data_tr/tdnn_3_bnf_feats.scp"
+    copy-feats --compress=true "$feats_tr" ark,scp:$tmpdir/$language_name/train.ark,$tmpdir/$language_name/train_local.scp || exit 1;
 
 
     labels_tr=$(ls $language_dir | grep labels | grep \.tr)
